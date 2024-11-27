@@ -3,11 +3,10 @@ from urllib.parse import urlparse
 
 class App:
     def __init__(self):
-        self.routes = {}  # Store routes as {path: {method: handler}}
+        self.routes = {}  
 
     def route(self, path, methods=['GET']):
         def decorator(func):
-            # Add the route to the dictionary for each method
             for method in methods:
                 if path not in self.routes:
                     self.routes[path] = {}
@@ -30,17 +29,14 @@ class App:
                 self._handle_request('POST')
 
             def _handle_request(self, method):
-                # Parse the path and remove query strings
                 parsed_path = urlparse(self.path).path
                 if parsed_path in routes and method in routes[parsed_path]:
-                    # Call the handler and send a response
                     handler = routes[parsed_path][method]
                     response = handler(self)
                     self.send_response(200)
                     self.end_headers()
                     self.wfile.write(response.encode())
                 else:
-                    # Respond with 404 if no route matches
                     self.send_response(404)
                     self.end_headers()
                     self.wfile.write(b'{"error": "Not Found"}')
