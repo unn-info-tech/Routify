@@ -1,44 +1,68 @@
-from http.server import BaseHTTPRequestHandler, HTTPServer
-from urllib.parse import urlparse
+from wsgiref.simple_server import make_server
 
-class App:
+class Routify:
     def __init__(self):
-        self.routes = {}  
+        self.routes = {}  # Store routes and their handlers
 
     def route(self, path, methods=['GET']):
+        """Decorator to add a route for specific methods."""
         def decorator(func):
+            if path not in self.routes:
+                self.routes[path] = {}
             for method in methods:
-                if path not in self.routes:
-                    self.routes[path] = {}
                 self.routes[path][method] = func
             return func
         return decorator
 
-    def run(self, host='127.0.0.1', port=8000):
-        server = HTTPServer((host, port), self._handler())
-        print(f"Running on http://{host}:{port}")
+    def __call__(self, environ, start_response):
+        """WSGI application entry point."""
+        path = environ.get('PATH_INFO', '/')  # Get the requested path
+        method = environ.get('REQUEST_METHOD', 'GET')  # Get the HTTP method
+
+        # Check if the route and method exist
+        if path in self.routes and method in self.routes[path]:
+            handler = self.routes[path][method]
+
+            # If POST, read the request body
+            if method == 'POST':
+                try:
+                    content_length = int(environ.get('CONTENT_LENGTH', 0))
+                    body = environ['wsgi.input'].read(content_length).decode() if content_length > 0 else ''
+                except (ValueError, KeyError):
+                    body = ''
+                response = handler(environ, body)
+            else:
+                response = handler(environ)
+
+            start_response('200 OK', [('Content-Type', 'text/plain')])
+            return [response.encode()]
+        else:
+            # Handle 404 Not Found
+            start_response('404 Not Found', [('Content-Type', 'text/plain')])
+            return [b'Route not found']
+
+# Create an instance of Routify
+app = Routify()
+
+# Define a GET route
+@app.route("/", methods=["GET"])
+def home(environ):
+    return "Welcome to Routify!"
+
+# Define a POST route
+@app.route("/submit", methods=["POST"])
+def submit(environ, body):
+    return f"Received POST data: {body}"
+
+# Define a route that handles both GET and POST
+@app.route("/greet", methods=["GET", "POST"])
+def greet(environ, body=None):
+    if environ['REQUEST_METHOD'] == 'POST':
+        return f"Hello, POST! You sent: {body}"
+    return "Hello, GET!"
+
+# Run the application
+if __name__ == "__main__":
+    with make_server('', 8000, app) as server:
+        print("Serving on http://127.0.0.1:8000...")
         server.serve_forever()
-
-    def _handler(self):
-        routes = self.routes
-        class RequestHandler(BaseHTTPRequestHandler):
-            def do_GET(self):
-                self._handle_request('GET')
-
-            def do_POST(self):
-                self._handle_request('POST')
-
-            def _handle_request(self, method):
-                parsed_path = urlparse(self.path).path
-                if parsed_path in routes and method in routes[parsed_path]:
-                    handler = routes[parsed_path][method]
-                    response = handler(self)
-                    self.send_response(200)
-                    self.end_headers()
-                    self.wfile.write(response.encode())
-                else:
-                    self.send_response(404)
-                    self.end_headers()
-                    self.wfile.write(b'{"error": "Not Found"}')
-
-        return RequestHandler

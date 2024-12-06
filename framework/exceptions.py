@@ -1,2 +1,2 @@
-class RouteNotFound(Exception):
-    pass
+# class RouteNotFound(Exception):
+#     pass
