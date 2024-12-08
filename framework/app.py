@@ -2,10 +2,9 @@ from wsgiref.simple_server import make_server
 
 class Routify:
     def __init__(self):
-        self.routes = {}  # Store routes and their handlers
+        self.routes = {}
 
     def route(self, path, methods=['GET']):
-        """Decorator to add a route for specific methods."""
         def decorator(func):
             if path not in self.routes:
                 self.routes[path] = {}
@@ -15,15 +14,12 @@ class Routify:
         return decorator
 
     def __call__(self, environ, start_response):
-        """WSGI application entry point."""
-        path = environ.get('PATH_INFO', '/')  # Get the requested path
-        method = environ.get('REQUEST_METHOD', 'GET')  # Get the HTTP method
+        path = environ.get('PATH_INFO', '/')
+        method = environ.get('REQUEST_METHOD', 'GET')
 
-        # Check if the route and method exist
         if path in self.routes and method in self.routes[path]:
             handler = self.routes[path][method]
 
-            # If POST, read the request body
             if method == 'POST':
                 try:
                     content_length = int(environ.get('CONTENT_LENGTH', 0))
@@ -37,31 +33,25 @@ class Routify:
             start_response('200 OK', [('Content-Type', 'text/plain')])
             return [response.encode()]
         else:
-            # Handle 404 Not Found
             start_response('404 Not Found', [('Content-Type', 'text/plain')])
             return [b'Route not found']
 
-# Create an instance of Routify
 app = Routify()
 
-# Define a GET route
 @app.route("/", methods=["GET"])
 def home(environ):
     return "Welcome to Routify!"
 
-# Define a POST route
 @app.route("/submit", methods=["POST"])
 def submit(environ, body):
     return f"Received POST data: {body}"
 
-# Define a route that handles both GET and POST
 @app.route("/greet", methods=["GET", "POST"])
 def greet(environ, body=None):
     if environ['REQUEST_METHOD'] == 'POST':
         return f"Hello, POST! You sent: {body}"
     return "Hello, GET!"
 
-# Run the application
 if __name__ == "__main__":
     with make_server('', 8000, app) as server:
         print("Serving on http://127.0.0.1:8000...")
